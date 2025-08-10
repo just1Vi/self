@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ежедневный самоанализ — days</title>
+  <meta name="description" content="Локальное оффлайн‑приложение для ежедневного самоанализа. Сохраняет .txt в папку days." />
+  <meta name="color-scheme" content="light dark">
+  <style>
+    :root {
+      --bg: #0f1216;
+      --panel: #171b21;
+      --panel-2: #1d232b;
+      --text: #e9eef6;
+      --muted: #aab4c0;
+      --accent: #6be675;
+      --accent-2: #59c7ff;
+      --danger: #ff6b6b;
+      --warning: #ffd166;
+      --shadow: 0 8px 30px rgba(0,0,0,0.35);
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f7f9fc;
+        --panel: #ffffff;
+        --panel-2: #f0f3f8;
+        --text: #13233a;
+        --muted: #5c6b7a;
+        --accent: #16a34a;
+        --accent-2: #0ea5e9;
+        --danger: #dc2626;
+        --warning: #ca8a04;
+        --shadow: 0 8px 30px rgba(0,0,0,0.08);
+      }
+    }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: radial-gradient(1200px 600px at 20% -10%, rgba(91,182,255,0.08), transparent 60%),
+                  radial-gradient(800px 400px at 120% 10%, rgba(107,230,117,0.08), transparent 60%),
+                  var(--bg);
+      color: var(--text);
+      font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Noto Sans', 'Helvetica Neue', Arial, 'Apple Color Emoji', 'Segoe UI Emoji';
+    }
+    .app {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 16px;
+      padding: 16px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: var(--panel);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+    }
+    header .left { display: flex; align-items: center; gap: 12px; }
+    .logo {
+      width: 36px; height: 36px; border-radius: 9px; display: grid; place-items: center;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #0b1420; font-weight: 800;
+      box-shadow: inset 0 -6px 16px rgba(0,0,0,0.15);
+    }
+    .title { font-size: 18px; font-weight: 700; letter-spacing: 0.2px; }
+    .motto { color: var(--muted); font-size: 14px; }
+
+    .sidebar {
+      background: var(--panel);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: var(--shadow);
+      display: grid; gap: 12px;
+      align-content: start;
+    }
+    .card {
+      background: var(--panel-2);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .row { display: flex; align-items: center; gap: 8px; }
+
+    .btn {
+      --btn-bg: var(--panel-2);
+      --btn-fg: var(--text);
+      background: var(--btn-bg);
+      color: var(--btn-fg);
+      border: 1px solid rgba(128,128,128,0.2);
+      padding: 10px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: transform .05s ease, background .2s ease, border-color .2s ease;
+    }
+    .btn:hover { transform: translateY(-1px); border-color: rgba(128,128,128,0.35); }
+    .btn:active { transform: translateY(0); }
+    .btn.primary { --btn-bg: linear-gradient(135deg, var(--accent), var(--accent-2)); --btn-fg: #0b1420; font-weight: 700; border: none; }
+    .btn.warning { --btn-bg: var(--warning); --btn-fg: #0b1420; border: none; }
+    .btn.danger { --btn-bg: var(--danger); --btn-fg: #0b1420; border: none; }
+    .btn.ghost { background: transparent; border: 1px dashed rgba(128,128,128,0.3); }
+
+    .editor {
+      background: var(--panel);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: var(--shadow);
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-height: calc(100vh - 160px);
+    }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+    .toolbar-right { display: flex; align-items: center; gap: 8px; }
+
+    .fields {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .field { display: grid; gap: 6px; }
+    .field label { font-size: 13px; color: var(--muted); }
+    .field input[type="text"], .field input[type="time"], .field textarea {
+      background: var(--panel-2);
+      border: 1px solid rgba(128,128,128,0.25);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font: inherit;
+    }
+    .field textarea { min-height: 84px; resize: vertical; }
+    .full { grid-column: 1 / -1; }
+
+    .list {
+      display: grid; gap: 6px; max-height: 50vh; overflow: auto; padding-right: 4px;
+    }
+    .list-item {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 8px; align-items: center;
+      padding: 10px 12px; border-radius: 10px; background: var(--panel-2);
+      border: 1px solid transparent; cursor: pointer;
+    }
+    .list-item:hover { border-color: rgba(128,128,128,0.35); }
+    .list-item .name { font-weight: 600; }
+    .badge { font-size: 12px; color: var(--muted); }
+    .star { color: #f6c94c; }
+
+    .status {
+      display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); box-shadow: 0 0 0 0 rgba(107,230,117,0.7); }
+    .dot.saved { background: var(--accent); animation: pulse 2s ease-out; }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(107,230,117,0.7);} 100% { box-shadow: 0 0 0 18px rgba(107,230,117,0);} }
+
+    .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 18px; background: var(--panel); border: 1px solid rgba(128,128,128,0.25); padding: 10px 14px; border-radius: 10px; box-shadow: var(--shadow); opacity: 0; pointer-events: none; transition: opacity .25s ease, transform .25s ease; }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+
+    .hidden { display: none !important; }
+
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+
+    @media (max-width: 980px) {
+      .app { grid-template-columns: 1fr; }
+      .fields { grid-template-columns: 1fr; }
+      header { position: sticky; top: 0; z-index: 10; }
+    }
+  </style>
+</head>
+<body>
+  <a class="sr-only" href="#main">К содержанию</a>
+  <div class="app" role="application" aria-label="Ежедневный самоанализ">
+    <header>
+      <div class="left">
+        <div class="logo" aria-hidden="true">D</div>
+        <div>
+          <div class="title">days — ежедневный самоанализ</div>
+          <div class="motto" id="motto">Отлично — ещё одна маленькая победа</div>
+        </div>
+      </div>
+      <div class="toolbar-right">
+        <button id="themeToggle" class="btn" aria-label="Переключить тему">Тема</button>
+        <button id="exportAllBtn" class="btn" aria-label="Экспортировать все записи в ZIP">Экспортировать всё</button>
+      </div>
+    </header>
+
+    <aside class="sidebar" aria-label="Панель">
+      <div class="card" role="status" aria-live="polite">
+        <div class="row" style="justify-content: space-between;">
+          <div>
+            <div style="font-weight:700;">Стрик</div>
+            <div id="streak" class="badge">0 дней подряд</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-weight:700;">Сегодня</div>
+            <div id="todayLabel" class="badge"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row" style="justify-content: space-between; align-items: center;">
+          <div>
+            <div style="font-weight:700;">Хранилище</div>
+            <div id="storageMode" class="badge">—</div>
+          </div>
+          <button id="pickDirBtn" class="btn primary" aria-label="Выбрать папку days">Выбрать папку days</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="font-weight:700; margin-bottom:8px;">Записи</div>
+        <div id="entriesList" class="list" role="list" aria-label="Список записей"></div>
+      </div>
+
+      <div class="card">
+        <div class="row" style="justify-content: space-between; align-items: center;">
+          <div class="row" style="gap:6px;">
+            <input id="importantToggle" type="checkbox" aria-label="Пометить запись как важная" />
+            <div>Пометить как <span class="star">важная ★</span></div>
+          </div>
+          <div id="importantHint" class="badge">локально</div>
+        </div>
+      </div>
+    </aside>
+
+    <main id="main" class="editor" aria-label="Редактор">
+      <div class="toolbar">
+        <div class="row" style="gap:8px; align-items: center;">
+          <label class="sr-only" for="dateInput">Дата записи</label>
+          <input id="dateInput" type="date" class="btn" aria-label="Дата записи" />
+          <div id="status" class="status" aria-live="polite">
+            <span class="dot" id="statusDot" aria-hidden="true"></span>
+            <span id="statusLabel">Черновик</span>
+          </div>
+        </div>
+        <div class="toolbar-right">
+          <button id="downloadBtn" class="btn ghost hidden">Скачать .txt</button>
+          <button id="saveBtn" class="btn primary" aria-keyshortcuts="Ctrl+S Meta+S">Сохранить</button>
+          <button id="saveCloseBtn" class="btn" aria-label="Сохранить и закрыть">Сохранить и закрыть</button>
+        </div>
+      </div>
+
+      <section class="fields" aria-label="Поля заметки">
+        <div class="field">
+          <label for="wakeTime">Время подъёма</label>
+          <input id="wakeTime" type="time" inputmode="numeric" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label for="sleepTime">Время отхода ко сну</label>
+          <input id="sleepTime" type="time" inputmode="numeric" autocomplete="off" />
+        </div>
+
+        <div class="field full">
+          <label for="wakeHow">Как прошел поднятие</label>
+          <textarea id="wakeHow" placeholder="Коротко: как дался подъём?"></textarea>
+        </div>
+        <div class="field full">
+          <label for="morning">Утренний ритуал</label>
+          <textarea id="morning" placeholder="Молитва, мотивация, разбор…"></textarea>
+        </div>
+        <div class="field full">
+          <label for="work">Работа</label>
+          <textarea id="work" placeholder="Что сделал, как продвигался"></textarea>
+        </div>
+        <div class="field full">
+          <label for="productivity">Работоспособность</label>
+          <textarea id="productivity" placeholder="Оценка 1–10 и комментарий"></textarea>
+        </div>
+        <div class="field full">
+          <label for="freeTime">Свободное время</label>
+          <textarea id="freeTime" placeholder="Прогулки, чтение, отдых"></textarea>
+        </div>
+        <div class="field full">
+          <label for="evening">Вечер</label>
+          <textarea id="evening" placeholder="Подготовка ко сну, ритуалы"></textarea>
+        </div>
+        <div class="field full">
+          <label for="mistakes">Ключевые ошибки дня</label>
+          <textarea id="mistakes" placeholder="Что пошло не так"></textarea>
+        </div>
+        <div class="field full">
+          <label for="decisions">Решения на завтра</label>
+          <textarea id="decisions" placeholder="Какие шаги предпринять"></textarea>
+        </div>
+      </section>
+
+      <div class="row" style="justify-content: space-between; align-items:center; margin-top: 12px;">
+        <div class="badge">Версия приложения: <span id="appVersion">1.0.0</span></div>
+        <div class="badge">Горячая клавиша: Ctrl/Cmd + S</div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <dialog id="conflictDialog" aria-labelledby="conflictTitle">
+    <form method="dialog" style="min-width:320px; background: var(--panel); color: var(--text); border-radius: 12px; border: 1px solid rgba(128,128,128,0.25);">
+      <div style="padding:14px 14px 0; font-weight:700;" id="conflictTitle">Файл уже существует</div>
+      <div style="padding:8px 14px 0; color: var(--muted);">Выберите действие:</div>
+      <div style="display:grid; gap:8px; padding: 12px 14px;">
+        <button value="overwrite" class="btn danger">Перезаписать</button>
+        <button value="copy" class="btn">Создать копию (-v2)</button>
+        <button value="merge" class="btn">Объединить</button>
+        <button value="cancel" class="btn ghost">Отмена</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+  // App constants
+  const APP_VERSION = '1.0.0';
+  const AUTOSAVE_INTERVAL_MS = 20000; // 20s
+  const STORAGE_KEYS = {
+    importantMap: 'days.important.map.v1',
+    fallbackNotes: 'days.fallback.notes.v1' // { 'YYYY-MM-DD.txt': content }
+  };
+
+  // State
+  let daysRootHandle = null;           // Picked root directory (user-selected)
+  let daysDirHandle = null;            // Subdirectory 'days'
+  let currentFileHandle = null;        // Handle to the currently opened file
+  let currentFileName = null;          // Name of currently opened file (e.g., YYYY-MM-DD.txt)
+  let currentDateStr = null;           // YYYY-MM-DD
+  let isSaving = false;
+  let autosaveTimer = null;
+  let hasFSAccess = 'showDirectoryPicker' in window;
+  let storageModeEl, pickDirBtn, entriesListEl, statusLabelEl, statusDotEl, dateInputEl;
+  let importantToggleEl;
+
+  // Utility: date formatting
+  function pad2(n){ return String(n).padStart(2,'0'); }
+  function formatDateLocal(date){
+    const y = date.getFullYear();
+    const m = pad2(date.getMonth()+1);
+    const d = pad2(date.getDate());
+    return `${y}-${m}-${d}`;
+  }
+  function parseDateFromFilename(name){
+    // YYYY-MM-DD or YYYY-MM-DD-vN
+    const base = name.replace(/\.txt$/i,'');
+    const match = base.match(/^(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : null;
+  }
+
+  // Utility: toast
+  function showToast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  // Utility: status indicator
+  function setSaved(){
+    const dot = document.getElementById('statusDot');
+    dot.classList.add('saved');
+    setTimeout(() => dot.classList.remove('saved'), 1000);
+    const now = new Date();
+    statusLabelEl.textContent = `Сохранено: ${pad2(now.getHours())}:${pad2(now.getMinutes())}:${pad2(now.getSeconds())}`;
+  }
+  function setUnsaved(){
+    statusLabelEl.textContent = 'Изменения не сохранены';
+  }
+
+  // ZIP builder (STORE method, no compression)
+  function textToUint8(text){ return new TextEncoder().encode(text); }
+  function crc32(buf){
+    let table = crc32.table;
+    if (!table){
+      table = new Uint32Array(256);
+      for(let i=0; i<256; i++){
+        let c=i;
+        for(let k=0;k<8;k++){ c = c & 1 ? 0xEDB88320 ^ (c>>>1) : c>>>1; }
+        table[i]=c>>>0;
+      }
+      crc32.table = table;
+    }
+    let c = 0 ^ (-1);
+    for(let i=0;i<buf.length;i++) c = (c>>>8) ^ table[(c ^ buf[i]) & 0xFF];
+    return (c ^ (-1)) >>> 0;
+  }
+  function dosDateTime(d){
+    const year = d.getFullYear();
+    const month = d.getMonth()+1;
+    const day = d.getDate();
+    const hours = d.getHours();
+    const minutes = d.getMinutes();
+    const seconds = Math.floor(d.getSeconds()/2);
+    const dosTime = (hours<<11) | (minutes<<5) | seconds;
+    const dosDate = ((year-1980)<<9) | (month<<5) | day;
+    return {dosTime, dosDate};
+  }
+  function uint16LE(n){ const b=new Uint8Array(2); const v=new DataView(b.buffer); v.setUint16(0,n,true); return b; }
+  function uint32LE(n){ const b=new Uint8Array(4); const v=new DataView(b.buffer); v.setUint32(0,n,true); return b; }
+  function concatUint8(arrays){
+    let total=0; for(const a of arrays) total+=a.length;
+    const out=new Uint8Array(total);
+    let off=0; for(const a of arrays){ out.set(a,off); off+=a.length; }
+    return out;
+  }
+  function createZip(files){
+    // files: [{name: 'days/2025-08-10.txt', data: Uint8Array, date?: Date}]
+    const localParts=[];
+    const centralParts=[];
+    let offset=0;
+    for(const f of files){
+      const nameBytes = textToUint8(f.name);
+      const data = f.data;
+      const crc = crc32(data);
+      const modDate = dosDateTime(f.date || new Date());
+      // Local file header
+      const lf = concatUint8([
+        uint32LE(0x04034b50), // signature
+        uint16LE(20), // version needed
+        uint16LE(0), // flags
+        uint16LE(0), // method store
+        uint16LE(modDate.dosTime),
+        uint16LE(modDate.dosDate),
+        uint32LE(crc),
+        uint32LE(data.length),
+        uint32LE(data.length),
+        uint16LE(nameBytes.length),
+        uint16LE(0), // extra len
+        nameBytes,
+        data
+      ]);
+      localParts.push(lf);
+
+      // Central directory header
+      const cf = concatUint8([
+        uint32LE(0x02014b50),
+        uint16LE(20), // version made by
+        uint16LE(20), // version needed
+        uint16LE(0),
+        uint16LE(0),
+        uint16LE(modDate.dosTime),
+        uint16LE(modDate.dosDate),
+        uint32LE(crc),
+        uint32LE(data.length),
+        uint32LE(data.length),
+        uint16LE(nameBytes.length),
+        uint16LE(0), // extra
+        uint16LE(0), // comment
+        uint16LE(0), // disk number
+        uint16LE(0), // internal attrs
+        uint32LE(0), // external attrs
+        uint32LE(offset), // relative offset
+        nameBytes
+      ]);
+      centralParts.push(cf);
+      offset += lf.length;
+    }
+    const central = concatUint8(centralParts);
+    const locals = concatUint8(localParts);
+    const end = concatUint8([
+      uint32LE(0x06054b50),
+      uint16LE(0), // disk
+      uint16LE(0), // start disk
+      uint16LE(files.length),
+      uint16LE(files.length),
+      uint32LE(central.length),
+      uint32LE(locals.length),
+      uint16LE(0) // comment
+    ]);
+    const blob = new Blob([locals, central, end], {type: 'application/zip'});
+    return blob;
+  }
+
+  // Template
+  function buildContentFromUI(){
+    const dStr = currentDateStr;
+    const savedAt = new Date().toISOString();
+    const value = (id) => document.getElementById(id).value.trim();
+    return [
+      `Дата: ${dStr}`,
+      `Время подъёма: ${value('wakeTime')}`,
+      `Как прошел поднятие: ${value('wakeHow')}`,
+      `Утренний ритуал: ${value('morning')}`,
+      `Работа: ${value('work')}`,
+      `Работоспособность: ${value('productivity')}`,
+      `Свободное время: ${value('freeTime')}`,
+      `Вечер: ${value('evening')}`,
+      `Время отхода ко сну: ${value('sleepTime')}`,
+      `Ключевые ошибки дня: ${value('mistakes')}`,
+      `Решения на завтра: ${value('decisions')}`,
+      `savedAt: ${savedAt}`,
+      `appVersion: ${APP_VERSION}`
+    ].join('\n');
+  }
+  const FIELD_ORDER = [
+    'Дата',
+    'Время подъёма',
+    'Как прошел поднятие',
+    'Утренний ритуал',
+    'Работа',
+    'Работоспособность',
+    'Свободное время',
+    'Вечер',
+    'Время отхода ко сну',
+    'Ключевые ошибки дня',
+    'Решения на завтра',
+    'savedAt',
+    'appVersion'
+  ];
+  function parseContentToFields(text){
+    const result = {};
+    for(const line of text.split(/\r?\n/)){
+      const idx = line.indexOf(':');
+      if (idx === -1) continue;
+      const key = line.slice(0, idx).trim();
+      const val = line.slice(idx+1).trim();
+      if (FIELD_ORDER.includes(key)) result[key] = val;
+    }
+    return result;
+  }
+  function applyFieldsToUI(fields){
+    // Assume Дата matches currentDateStr
+    const set = (id, val) => { document.getElementById(id).value = val || ''; };
+    set('wakeTime', fields['Время подъёма']);
+    set('sleepTime', fields['Время отхода ко сну']);
+    set('wakeHow', fields['Как прошел поднятие']);
+    set('morning', fields['Утренний ритуал']);
+    set('work', fields['Работа']);
+    set('productivity', fields['Работоспособность']);
+    set('freeTime', fields['Свободное время']);
+    set('evening', fields['Вечер']);
+    set('mistakes', fields['Ключевые ошибки дня']);
+    set('decisions', fields['Решения на завтра']);
+  }
+  function mergeFields(oldFields, newFields){
+    const merged = {...oldFields};
+    for(const key of FIELD_ORDER){
+      if (key === 'Дата' || key === 'savedAt' || key === 'appVersion') continue;
+      const newVal = newFields[key] || '';
+      const oldVal = oldFields[key] || '';
+      merged[key] = newVal ? newVal : oldVal;
+    }
+    merged['Дата'] = newFields['Дата'] || oldFields['Дата'];
+    merged['savedAt'] = new Date().toISOString();
+    merged['appVersion'] = APP_VERSION;
+    return merged;
+  }
+  function stringifyFields(fields){
+    return [
+      `Дата: ${fields['Дата'] || ''}`,
+      `Время подъёма: ${fields['Время подъёма'] || ''}`,
+      `Как прошел поднятие: ${fields['Как прошел поднятие'] || ''}`,
+      `Утренний ритуал: ${fields['Утренний ритуал'] || ''}`,
+      `Работа: ${fields['Работа'] || ''}`,
+      `Работоспособность: ${fields['Работоспособность'] || ''}`,
+      `Свободное время: ${fields['Свободное время'] || ''}`,
+      `Вечер: ${fields['Вечер'] || ''}`,
+      `Время отхода ко сну: ${fields['Время отхода ко сну'] || ''}`,
+      `Ключевые ошибки дня: ${fields['Ключевые ошибки дня'] || ''}`,
+      `Решения на завтра: ${fields['Решения на завтра'] || ''}`,
+      `savedAt: ${fields['savedAt'] || ''}`,
+      `appVersion: ${fields['appVersion'] || APP_VERSION}`
+    ].join('\n');
+  }
+
+  // Important flag stored only in localStorage
+  function getImportantMap(){
+    try{ return JSON.parse(localStorage.getItem(STORAGE_KEYS.importantMap) || '{}'); }catch{ return {}; }
+  }
+  function setImportant(dateStr, value){
+    const map = getImportantMap();
+    map[dateStr] = !!value;
+    localStorage.setItem(STORAGE_KEYS.importantMap, JSON.stringify(map));
+  }
+  function isImportant(dateStr){ return !!getImportantMap()[dateStr]; }
+
+  // Fallback storage for notes (no FS Access API)
+  function getFallbackNotes(){
+    try{ return JSON.parse(localStorage.getItem(STORAGE_KEYS.fallbackNotes) || '{}'); }catch{ return {}; }
+  }
+  function setFallbackNote(filename, content){
+    const m = getFallbackNotes();
+    m[filename] = content;
+    localStorage.setItem(STORAGE_KEYS.fallbackNotes, JSON.stringify(m));
+  }
+  function removeFallbackNote(filename){
+    const m = getFallbackNotes();
+    delete m[filename];
+    localStorage.setItem(STORAGE_KEYS.fallbackNotes, JSON.stringify(m));
+  }
+
+  // FS helpers
+  async function ensureDaysSubdir(rootHandle){
+    try {
+      const sub = await rootHandle.getDirectoryHandle('days', {create: true});
+      return sub;
+    } catch (e){ console.error(e); throw e; }
+  }
+  async function listTxtEntries(dirHandle){
+    const entries = [];
+    for await (const [name, handle] of dirHandle.entries()){
+      if (handle.kind === 'file' && /\.txt$/i.test(name)){
+        const dateStr = parseDateFromFilename(name);
+        if (dateStr) entries.push({name, handle, dateStr});
+      }
+    }
+    entries.sort((a,b)=> a.name.localeCompare(b.name));
+    return entries;
+  }
+
+  function updateStorageModeLabel(){
+    const el = document.getElementById('storageMode');
+    if (daysDirHandle) el.textContent = 'FS Access API — директория: days';
+    else if (hasFSAccess) el.textContent = 'Требуется выбрать папку';
+    else el.textContent = 'Fallback: localStorage / загрузка .txt';
+  }
+
+  async function pickDirectory(){
+    if (!hasFSAccess){ showToast('Ваш браузер не поддерживает доступ к файловой системе. Используйте экспорт/скачивание.'); return; }
+    try{
+      daysRootHandle = await window.showDirectoryPicker({id: 'days-root'});
+      daysDirHandle = await ensureDaysSubdir(daysRootHandle);
+      updateStorageModeLabel();
+      await refreshEntriesList();
+      showToast('Папка подключена');
+    }catch(e){
+      if (e && e.name === 'AbortError') return;
+      console.error(e);
+      showToast('Не удалось выбрать папку');
+    }
+  }
+
+  // Entries list and streak
+  async function refreshEntriesList(){
+    const list = entriesListEl;
+    list.textContent = '';
+    let entries = [];
+    if (daysDirHandle){
+      entries = await listTxtEntries(daysDirHandle);
+    } else if (!hasFSAccess){
+      const m = getFallbackNotes();
+      for (const name of Object.keys(m)){
+        const dateStr = parseDateFromFilename(name);
+        if (dateStr) entries.push({name, handle: null, dateStr});
+      }
+      entries.sort((a,b)=> a.name.localeCompare(b.name));
+    }
+    for(const entry of entries){
+      const div = document.createElement('div');
+      div.className = 'list-item';
+      div.setAttribute('role','listitem');
+      const isImp = isImportant(entry.dateStr);
+      div.innerHTML = `
+        <div class="name">${entry.name}</div>
+        <div class="badge">${entry.dateStr}</div>
+        <div class="badge">${isImp ? '<span class="star" title="Важная">★</span>' : ''}</div>
+      `;
+      div.addEventListener('click', () => openEntry(entry));
+      list.appendChild(div);
+    }
+    updateStreak(entries.map(e=>e.dateStr));
+  }
+  function updateStreak(dateStrList){
+    const set = new Set(dateStrList);
+    let count = 0;
+    const today = new Date();
+    for(let i=0;i<9999;i++){
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const s = formatDateLocal(d);
+      if (set.has(s)) count++; else break;
+    }
+    const streakEl = document.getElementById('streak');
+    streakEl.textContent = count + (count === 1 ? ' день подряд' : (count >= 2 && count <=4 ? ' дня подряд' : ' дней подряд'));
+  }
+
+  async function openEntry(entry){
+    // Load by date
+    const dateStr = entry.dateStr;
+    currentDateStr = dateStr;
+    dateInputEl.value = dateStr;
+
+    let content = '';
+    try{
+      if (daysDirHandle && entry.handle){
+        const file = await entry.handle.getFile();
+        content = await file.text();
+        currentFileHandle = entry.handle;
+      } else if (!hasFSAccess){
+        const m = getFallbackNotes();
+        content = m[entry.name] || '';
+        currentFileHandle = null;
+      }
+    }catch(e){ console.error(e); showToast('Не удалось открыть файл'); }
+
+    const fields = parseContentToFields(content);
+    applyFieldsToUI(fields);
+    importantToggleEl.checked = isImportant(dateStr);
+    currentFileName = fileNameFor(dateStr);
+    setUnsaved();
+  }
+
+  // Save logic
+  function fileNameFor(dateStr){ return `${dateStr}.txt`; }
+
+  async function saveCurrent({closeAfter=false}={}){
+    if (isSaving) return; isSaving = true;
+    try{
+      if (!currentDateStr){ currentDateStr = formatDateLocal(new Date()); }
+      const filenameBase = fileNameFor(currentDateStr);
+      const content = buildContentFromUI();
+
+      // Prompt to pick folder on first save if supported
+      if (hasFSAccess && !daysDirHandle){
+        try { await pickDirectory(); } catch {}
+      }
+
+      if (daysDirHandle){
+        // If editing another file but date changed to an existing one, handle conflict
+        const targetName = filenameBase;
+        let targetExists = false;
+        try { await daysDirHandle.getFileHandle(targetName, {create:false}); targetExists = true; } catch {}
+
+        // If we have a current file and it's the same target, just overwrite
+        if (currentFileHandle && currentFileName === targetName){
+          await writeToHandle(currentFileHandle, content);
+        } else if (!targetExists){
+          // Create new
+          const fh = await daysDirHandle.getFileHandle(targetName, {create:true});
+          await writeToHandle(fh, content);
+          currentFileHandle = fh;
+          currentFileName = targetName;
+        } else {
+          // Conflict path
+          await handleConflictAndSave(targetName, content);
+        }
+      } else {
+        // Fallback: keep in localStorage and allow download
+        setFallbackNote(filenameBase, content);
+        triggerDownloadBtnVisibility(true);
+      }
+
+      setImportant(currentDateStr, importantToggleEl.checked);
+      setSaved();
+      await refreshEntriesList();
+      if (closeAfter){
+        try { window.close(); } catch {}
+        showToast('Можно закрывать вкладку');
+      }
+    } catch(e){
+      console.error(e);
+      showToast('Ошибка при сохранении');
+    } finally { isSaving = false; }
+  }
+
+  async function handleConflictAndSave(filenameBase, newContent){
+    // If file exists, prompt for action
+    try{
+      // Confirm exists
+      let exists = false; let existingHandle=null;
+      try { existingHandle = await daysDirHandle.getFileHandle(filenameBase, {create: false}); exists = true; } catch {}
+      if (!exists){
+        const fh = await daysDirHandle.getFileHandle(filenameBase, {create: true});
+        await writeToHandle(fh, newContent); currentFileHandle = fh; return;
+      }
+      const dlg = document.getElementById('conflictDialog');
+      const val = await new Promise(resolve => {
+        dlg.returnValue = 'cancel';
+        dlg.addEventListener('close', () => resolve(dlg.returnValue), {once:true});
+        try { dlg.showModal(); } catch { resolve('cancel'); }
+      });
+      if (val === 'overwrite'){
+        await writeToHandle(existingHandle, newContent);
+        currentFileHandle = existingHandle;
+        currentFileName = filenameBase;
+        return;
+      }
+      if (val === 'copy'){
+        let idx = 2; let name = filenameBase.replace(/\.txt$/i, `-v${idx}.txt`);
+        while(true){
+          try{ await daysDirHandle.getFileHandle(name, {create:false}); idx++; name = filenameBase.replace(/\.txt$/i, `-v${idx}.txt`); }
+          catch{ break; }
+        }
+        const fh = await daysDirHandle.getFileHandle(name, {create:true});
+        await writeToHandle(fh, newContent); currentFileHandle = fh; currentFileName = name; return;
+      }
+      if (val === 'merge'){
+        const file = await existingHandle.getFile();
+        const oldText = await file.text();
+        const oldFields = parseContentToFields(oldText);
+        const newFields = parseContentToFields(newContent);
+        const merged = mergeFields(oldFields, newFields);
+        const mergedText = stringifyFields(merged);
+        await writeToHandle(existingHandle, mergedText);
+        currentFileHandle = existingHandle; currentFileName = filenameBase; return;
+      }
+      // cancel — do nothing
+    } catch (e){ console.error(e); showToast('Не удалось обработать конфликт'); }
+  }
+
+  async function writeToHandle(fileHandle, text){
+    const writable = await fileHandle.createWritable();
+    await writable.write(text);
+    await writable.close();
+  }
+
+  function triggerDownload(filename, text){
+    const a = document.createElement('a');
+    a.download = filename;
+    a.href = URL.createObjectURL(new Blob([text], {type:'text/plain;charset=utf-8'}));
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+  }
+  function triggerDownloadBtnVisibility(visible){
+    document.getElementById('downloadBtn').classList.toggle('hidden', !visible);
+  }
+
+  async function exportAll(){
+    let files = [];
+    if (daysDirHandle){
+      const entries = await listTxtEntries(daysDirHandle);
+      for(const e of entries){
+        const file = await e.handle.getFile();
+        const text = await file.text();
+        const data = textToUint8(text);
+        files.push({name: `days/${e.name}`, data, date: new Date()});
+      }
+    } else {
+      const m = getFallbackNotes();
+      for(const name of Object.keys(m)){
+        files.push({name: `days/${name}`, data: textToUint8(m[name]), date: new Date()});
+      }
+    }
+    if (files.length === 0){ showToast('Нет файлов для экспорта'); return; }
+    const zipBlob = createZip(files);
+    const a = document.createElement('a');
+    a.download = `days-export-${formatDateLocal(new Date())}.zip`;
+    a.href = URL.createObjectURL(zipBlob);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+  }
+
+  // UI Events
+  function onAnyChange(){ setUnsaved(); scheduleAutosave(); }
+  function scheduleAutosave(){
+    if (autosaveTimer) clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(()=> saveCurrent(), AUTOSAVE_INTERVAL_MS);
+  }
+
+  function updateTodayLabel(){
+    const now = new Date();
+    document.getElementById('todayLabel').textContent = now.toLocaleDateString('ru-RU', { weekday:'long', day:'2-digit', month:'long' });
+  }
+
+  function setTheme(mode){
+    if (mode === 'light') document.documentElement.style.colorScheme = 'light';
+    else if (mode === 'dark') document.documentElement.style.colorScheme = 'dark';
+    else document.documentElement.style.colorScheme = '';
+    localStorage.setItem('days.theme', mode || 'auto');
+  }
+  function initTheme(){
+    const mode = localStorage.getItem('days.theme') || 'auto';
+    setTheme(mode);
+    document.getElementById('themeToggle').textContent = mode === 'light' ? 'Тёмная тема' : (mode === 'dark' ? 'Светлая тема' : 'Тема: Авто');
+  }
+
+  function toggleTheme(){
+    const mode = localStorage.getItem('days.theme') || 'auto';
+    const next = mode === 'auto' ? 'dark' : (mode === 'dark' ? 'light' : 'auto');
+    setTheme(next);
+    initTheme();
+  }
+
+  function initKeyboard(){
+    window.addEventListener('keydown', (e)=>{
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's'){
+        e.preventDefault(); saveCurrent();
+      }
+    });
+  }
+
+  function bindFieldChanges(){
+    const ids = ['wakeTime','sleepTime','wakeHow','morning','work','productivity','freeTime','evening','mistakes','decisions'];
+    for(const id of ids){
+      const el = document.getElementById(id);
+      el.addEventListener('input', onAnyChange);
+      el.addEventListener('change', onAnyChange);
+    }
+  }
+
+  async function initNewDay(){
+    const today = formatDateLocal(new Date());
+    currentDateStr = today;
+    dateInputEl.value = today;
+    if (daysDirHandle){
+      // If file exists, load it
+      try{ const fh = await daysDirHandle.getFileHandle(fileNameFor(today), {create:false});
+        const file = await fh.getFile();
+        const text = await file.text();
+        applyFieldsToUI(parseContentToFields(text));
+        currentFileHandle = fh;
+        currentFileName = fileNameFor(today);
+      } catch{}
+    } else {
+      // Fallback: load from localStorage
+      const m = getFallbackNotes();
+      const txt = m[fileNameFor(today)];
+      if (txt) applyFieldsToUI(parseContentToFields(txt));
+      triggerDownloadBtnVisibility(!hasFSAccess);
+    }
+    importantToggleEl.checked = isImportant(today);
+    setUnsaved();
+  }
+
+  async function onDateChange(){
+    const val = dateInputEl.value;
+    if (!val) return;
+    await openEntry({ name: fileNameFor(val), dateStr: val, handle: daysDirHandle ? await safeGetHandle(val) : null });
+    currentFileName = fileNameFor(val);
+  }
+  async function safeGetHandle(dateStr){ try{ return await daysDirHandle.getFileHandle(fileNameFor(dateStr), {create:false}); } catch { return null; } }
+
+  function initBeforeUnload(){
+    window.addEventListener('beforeunload', (e)=>{
+      if (!daysDirHandle){
+        const content = buildContentFromUI();
+        setFallbackNote(fileNameFor(currentDateStr || formatDateLocal(new Date())), content);
+        // Attempt polite prompt
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+  }
+
+  function init(){
+    storageModeEl = document.getElementById('storageMode');
+    pickDirBtn = document.getElementById('pickDirBtn');
+    entriesListEl = document.getElementById('entriesList');
+    statusLabelEl = document.getElementById('statusLabel');
+    statusDotEl = document.getElementById('statusDot');
+    dateInputEl = document.getElementById('dateInput');
+    importantToggleEl = document.getElementById('importantToggle');
+
+    document.getElementById('appVersion').textContent = APP_VERSION;
+
+    pickDirBtn.addEventListener('click', pickDirectory);
+    document.getElementById('saveBtn').addEventListener('click', ()=> saveCurrent());
+    document.getElementById('saveCloseBtn').addEventListener('click', ()=> saveCurrent({closeAfter:true}));
+    document.getElementById('exportAllBtn').addEventListener('click', exportAll);
+    document.getElementById('downloadBtn').addEventListener('click', ()=>{
+      const txt = buildContentFromUI();
+      triggerDownload(fileNameFor(currentDateStr || formatDateLocal(new Date())), txt);
+    });
+
+    document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+
+    dateInputEl.addEventListener('change', onDateChange);
+    importantToggleEl.addEventListener('change', ()=> setImportant(currentDateStr, importantToggleEl.checked));
+
+    updateTodayLabel();
+    updateStorageModeLabel();
+    initTheme();
+    initKeyboard();
+    bindFieldChanges();
+    initBeforeUnload();
+    initNewDay();
+
+    if (!hasFSAccess){
+      document.getElementById('downloadBtn').classList.remove('hidden');
+      pickDirBtn.disabled = true; // not supported
+      pickDirBtn.title = 'Доступ к файловой системе не поддерживается вашим браузером';
+    }
+
+    refreshEntriesList();
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
